@@ -1,0 +1,133 @@
+---
+title: "Visualization_2016Voting"
+author: "Ci Song"
+date: "2022-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+```
+
+
+
+We merge the two data frames using the shared FIPS id column:
+```{r 1}
+load('county_map.rda')
+load('county_data.rda')
+county_full <- left_join(county_map, county_data, by = "id")
+head(county_full)
+```
+
+
+#### Draw a county-level map using su_gun6 variable. 
+```{r q11}
+g <- ggplot(county_full, aes(x=long, y=lat, fill=su_gun6, group=group))
+g1 <- g + geom_polygon(size = 0.04) + coord_equal() +
+  scale_fill_brewer(palette="Reds") + 
+  theme_map()
+g1 + labs(title = "Distribution of Firearm-related Suicides in the U.S. 1999-2015", fill = "per 100,000 Population") + 
+  theme(legend.position = "bottom")
+```
+
+
+#### Draw a county-level map using pop_dens6 variable using the same functions above.
+```{r q2}
+g <- ggplot(county_full, aes(x=long, y=lat, fill=pop_dens6, group=group))
+g2 <- g + geom_polygon(size = 0.04) + coord_equal() +
+  scale_fill_brewer(palette="Reds") + 
+  theme_map() +
+  labs(title = "Distribution of Population Density in the U.S. 1999-2015", fill = "Persons per Squared Mile") + 
+  theme(legend.position = "bottom")
+g2
+```
+
+#### Interpretation
+The first figure reveals the distribution of firearm-related suicides in the United State from 1999 to 2015. The number of suicides are divided into 6 categories, shown by different shades of red in the map. The darker the red turns, the larger number of firearm-related suicides is suggested. From an overall point of view, there are more suicides in the west with a compact distribution compared to the east, while there is an obvious light red area, meaning a smaller number of suicides, in the middle are. From comparison between the north and the south, there is not much difference shown in the figure. And also in the east part, the area with more suicides are more scattered than the west. 
+
+The second figure shows the population density in the United States from 1999 to 2015. The number of population density is larger when the red gets darker. It looks like the population density is greater on average in the east than in the west. While the population density seems lower in the west, there is quite high population density in the west coast area. Compared with the central area and the coast area, more people live around the latter. 
+
+When we compare these two figures together, it seems like there is a negative correlation between population density and firearm-related suicides. When there is high population density, there seem to be less firearm-related suicides, which can be shown by comparison from the west, the east and the coast areas in two figures. The possible reasons can be that when there is less population density, people pay less attention to do firearm control and the local firearm-related policies might be less strict than area with high population density. 
+
+#### Graph for flipped counties
+```{r}
+load("county_data.rda")
+party_colors <- c("#2E74C0", "#CB454A") # Democrat Blue and Republican Red
+p0 <- ggplot(data = subset(county_data,
+                           flipped == "No"),
+             mapping = aes(x = pop,
+                           y = black/100))
+p1 <- p0 + geom_point(alpha = 0.15, color = "gray50") + scale_x_log10(labels=scales::comma) 
+p2 <- p1 + geom_point(data = subset(county_data,
+                                    flipped == "Yes"),
+                      mapping = aes(x = pop, y = black/100,
+                                    color = partywinner16)) +
+  scale_color_manual(values = party_colors)
+p3 <- p2 + scale_y_continuous(labels=scales::percent) +
+    labs(color = "County flipped to ... ",
+         x = "County Population (log scale)",
+         y = "Percent Black Population",
+         title = "Flipped counties, 2016",
+         caption = "Counties in gray did not flip.")
+p4 <- p3 + geom_text_repel(data = subset(county_data,
+                                      flipped == "Yes" &
+                                      black  > 25),
+                           mapping = aes(x = pop,
+                                   y = black/100,
+                                   label = state), size = 2)
+p4
+```
+
+#### Create the scatter plot with the counties in which the number of population having less than 75 % of data points (the third quartile) only
+```{r 4_1}
+df <- subset(county_data, county_data$pop < quantile(county_full$pop, probs = c(0.75)))
+party_colors <- c("#2E74C0", "#CB454A") 
+g5 <- ggplot(data = subset(df,
+                           flipped == "No"),
+             mapping = aes(x = pop,
+                           y = black/100))
+g6 <- g5 + geom_point(alpha = 0.15) 
+g6 + labs(x = "County Population",
+         y = "Percent Black Population",
+         title = "Population under 75% quantile, 2016")
+```
+
+2. use the partisan colors to show the counties flipped
+```{r 4_2}
+g7 <- g6 + geom_point(data = subset(df,
+                                    flipped == "Yes"),
+                      mapping = aes(x = pop, y = black/100,
+                                    color = partywinner16)) +
+  scale_color_manual(values = party_colors)
+g7 + scale_y_continuous(labels=scales::percent) +
+    labs(color = "County flipped to ... ",
+         x = "County Population",
+         y = "Percent Black Population",
+         title = "Flipped counties with population under 75% quantile, 2016",
+         caption = "Counties in gray did not flip.")
+```
+
+3. plot the text labels for the counties flipped to Democrat 
+  - the text label needs to address both county and state: suffolk county, MA
+```{r 4_3}
+df1 <- df %>% mutate(countystate = paste(df$name, df$state))
+g7 + geom_text_repel(data = subset(df1,
+                                      flipped == "Yes" & partywinner16 == "Democrat"),
+                           mapping = aes(x = pop,
+                                   y = black/100,
+                                   label = countystate), size = 3) +
+  scale_y_continuous(labels=scales::percent) +
+  labs(color = "County flipped to ... ",
+         x = "County Population",
+         y = "Percent Black Population",
+         title = "Flipped counties with population under 75% quantile, 2016",
+         caption = "Counties in gray did not flip. 
+       Text lables inside the scatter plot are only shown for counties flipped to Democrat.")
+```
